@@ -1,0 +1,19 @@
+contrast_id,contrast_name,contrast_type,condition1,condition2,weight1,weight2,description
+1,CS-_first_half_others > FIXATION_first_half,T,CS-_first_half_others,FIXATION_first_half,1,-1,C1: CS-_first_half_others > FIXATION_first_half
+2,CSS_first_half_others > FIXATION_first_half,T,CSS_first_half_others,FIXATION_first_half,1,-1,C2: CSS_first_half_others > FIXATION_first_half
+3,CSR_first_half_others > FIXATION_first_half,T,CSR_first_half_others,FIXATION_first_half,1,-1,C3: CSR_first_half_others > FIXATION_first_half
+4,CSS_first_half_others > CSR_first_half_others,T,CSS_first_half_others,CSR_first_half_others,1,-1,C4: CSS_first_half_others > CSR_first_half_others
+5,CSR_first_half_others > CSS_first_half_others,T,CSR_first_half_others,CSS_first_half_others,1,-1,C5: CSR_first_half_others > CSS_first_half_others
+6,CSS_first_half_others > CS-_first_half_others,T,CSS_first_half_others,CS-_first_half_others,1,-1,C6: CSS_first_half_others > CS-_first_half_others
+7,CSR_first_half_others > CS-_first_half_others,T,CSR_first_half_others,CS-_first_half_others,1,-1,C7: CSR_first_half_others > CS-_first_half_others
+8,CS-_first_half_others > CSS_first_half_others,T,CS-_first_half_others,CSS_first_half_others,1,-1,C8: CS-_first_half_others > CSS_first_half_others
+9,CS-_first_half_others > CSR_first_half_others,T,CS-_first_half_others,CSR_first_half_others,1,-1,C9: CS-_first_half_others > CSR_first_half_others
+10,CS-_second_half_others > FIXATION_second_half,T,CS-_second_half_others,FIXATION_second_half,1,-1,C10: CS-_second_half_others > FIXATION_second_half
+11,CSS_second_half_others > FIXATION_second_half,T,CSS_second_half_others,FIXATION_second_half,1,-1,C11: CSS_second_half_others > FIXATION_second_half
+12,CSR_second_half_others > FIXATION_second_half,T,CSR_second_half_others,FIXATION_second_half,1,-1,C12: CSR_second_half_others > FIXATION_second_half
+13,CSS_second_half_others > CSR_second_half_others,T,CSS_second_half_others,CSR_second_half_others,1,-1,C13: CSS_second_half_others > CSR_second_half_others
+14,CSR_second_half_others > CSS_second_half_others,T,CSR_second_half_others,CSS_second_half_others,1,-1,C14: CSR_second_half_others > CSS_second_half_others
+15,CSS_second_half_others > CS-_second_half_others,T,CSS_second_half_others,CS-_second_half_others,1,-1,C15: CSS_second_half_others > CS-_second_half_others
+16,CSR_second_half_others > CS-_second_half_others,T,CSR_second_half_others,CS-_second_half_others,1,-1,C16: CSR_second_half_others > CS-_second_half_others
+17,CS-_second_half_others > CSS_second_half_others,T,CS-_second_half_others,CSS_second_half_others,1,-1,C17: CS-_second_half_others > CSS_second_half_others
+18,CS-_second_half_others > CSR_second_half_others,T,CS-_second_half_others,CSR_second_half_others,1,-1,C18: CS-_second_half_others > CSR_second_half_others
