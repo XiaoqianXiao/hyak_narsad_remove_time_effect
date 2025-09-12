@@ -540,10 +540,6 @@ def first_level_wf(in_files, output_dir, df_trial_info, contrasts=None,
 
     # Auto-generate contrasts if not provided
     if contrasts is None:
-        if condition_names is None:
-            # Default condition names - can be overridden
-            condition_names = ['condition1', 'condition2', 'condition3']
-        
         if contrast_type == 'custom' and contrast_patterns:
             contrasts, cs_conditions, css_conditions, csr_conditions, other_conditions = create_custom_contrasts(df_trial_info, contrast_patterns)
         else:
@@ -677,10 +673,6 @@ def first_level_wf_LSS(in_files, output_dir, trial_ID, df_trial_info, contrasts=
 
     # Auto-generate contrasts if not provided
     if contrasts is None:
-        if condition_names is None:
-            # Default LSS contrasts
-            condition_names = ['trial', 'others']
-        
         if contrast_type == 'custom' and contrast_patterns:
             contrasts, cs_conditions, css_conditions, csr_conditions, other_conditions = create_custom_contrasts(df_trial_info, contrast_patterns)
         else:
