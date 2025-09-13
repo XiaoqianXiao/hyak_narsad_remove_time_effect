@@ -78,7 +78,7 @@ RUN = []
 SPACE = ['MNI152NLin2009cAsym']
 
 # Output directory
-OUTPUT_DIR = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove_time_effect')
+OUTPUT_DIR = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove')
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
@@ -338,8 +338,8 @@ def create_slurm_script(sub, inputs, work_dir, output_dir, task, container_path)
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=40G
 #SBATCH --time=2:00:00
-#SBATCH --output=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel/{task}_sub_{sub}_%j.out
-#SBATCH --error=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel/{task}_sub_{sub}_%j.err
+#SBATCH --output=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel_timeEffect/{task}_sub_{sub}_%j.out
+#SBATCH --error=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel_timeEffect/{task}_sub_{sub}_%j.err
 
 module load apptainer
 apptainer exec \\
@@ -408,7 +408,7 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
         workflow.base_dir = os.path.join(work_dir, f'sub_{sub}')
         
         # Create output directory for this subject
-        subject_output_dir = os.path.join(output_dir, 'firstLevel', task, f'sub-{sub}')
+        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
         Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Running workflow for subject {sub}, task {task}")
@@ -452,7 +452,7 @@ def process_single_subject(args, layout, query):
             task = entities['task']
             
             # Create working directory
-            work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel/{task}')
+            work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel_timeEffect/{task}')
             Path(work_dir).mkdir(parents=True, exist_ok=True)
             
             try:
@@ -489,7 +489,7 @@ def generate_slurm_scripts(layout, query):
         task = entities['task']
         
         # Create working directory
-        work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel/{task}')
+        work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel_timeEffect/{task}')
         Path(work_dir).mkdir(parents=True, exist_ok=True)
         
         try:

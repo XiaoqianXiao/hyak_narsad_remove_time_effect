@@ -346,7 +346,7 @@ def load_first_level_data():
         tuple: (BIDSLayout, list of subject IDs)
     """
     try:
-        firstlevel_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis/firstLevel_timeEffect')
+        firstlevel_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/firstLevel_timeEffect')
         glayout = BIDSLayout(firstlevel_dir, validate=False, config=['bids', 'derivatives'])
         sub_list = sorted(glayout.get_subjects())
         
@@ -716,7 +716,7 @@ Examples:
             logger.info(f"Using custom output directory as base: {base_results_dir}")
         else:
             # Standard base: groupLevel/whole_brain
-            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis/groupLevel/whole_brain')
+            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/groupLevel/whole_brain')
             logger.info(f"Using default base directory: {base_results_dir}")
         
         # Always add data source components to the base directory
