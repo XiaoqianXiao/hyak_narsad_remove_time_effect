@@ -23,6 +23,126 @@ def _dict_ds(in_dict, sub, order=['bold', 'mask', 'events', 'regressors', 'tr'])
 def _dict_ds_lss(in_dict, sub, order=['bold', 'mask', 'events', 'regressors', 'tr', 'trial_ID']):
     return tuple([in_dict[sub][k] for k in order])
 
+def _bids2nipypeinfo_from_df(in_file, df_conditions, regressors_file,
+                             regressors_names=None,
+                             motion_columns=None,
+                             decimals=3, amplitude=1.0):
+    """
+    Convert processed DataFrame from extract_cs_conditions() to FSL-compatible format.
+    
+    This function uses the pre-processed DataFrame that already has the 'conditions' column
+    created by extract_cs_conditions(), ensuring consistent processing throughout the pipeline.
+    
+    Args:
+        in_file (str): Path to the BOLD data file
+        df_conditions (pandas.DataFrame): DataFrame with 'conditions' column from extract_cs_conditions()
+        regressors_file (str): Path to the regressors file
+        regressors_names (list): List of regressor names
+        motion_columns (list): List of motion parameter column names
+        decimals (int): Number of decimal places for rounding
+        amplitude (float): Default amplitude value
+    
+    Returns:
+        nipype.interfaces.base.support.Bunch: FSL-compatible session info
+    """
+    from pathlib import Path
+    import numpy as np
+    import pandas as pd
+    from nipype.interfaces.base.support import Bunch
+
+    # Validate input DataFrame
+    if not isinstance(df_conditions, pd.DataFrame):
+        raise ValueError("df_conditions must be a pandas DataFrame")
+    
+    if 'conditions' not in df_conditions.columns:
+        raise ValueError("DataFrame must have 'conditions' column from extract_cs_conditions()")
+    
+    required_columns = ['conditions', 'onset', 'duration']
+    missing_columns = [col for col in required_columns if col not in df_conditions.columns]
+    if missing_columns:
+        raise ValueError(f"DataFrame missing required columns: {missing_columns}")
+
+    print("=== DEBUG: Using processed DataFrame from extract_cs_conditions() ===")
+    print(f"DataFrame shape: {df_conditions.shape}")
+    print(f"DataFrame columns: {list(df_conditions.columns)}")
+    print(f"Processed conditions: {sorted(df_conditions['conditions'].unique().tolist())}")
+
+    bunch_fields = ['onsets', 'durations', 'amplitudes']
+
+    if not motion_columns:
+        from itertools import product
+        motion_columns = ['_'.join(v) for v in product(('trans', 'rot'), 'xyz')]
+
+    out_motion = Path('motion.par').resolve()
+
+    # Import the function locally to ensure it's available
+    from utils import read_csv_with_detection
+    regress_data = read_csv_with_detection(regressors_file)
+    
+    # Handle motion columns gracefully
+    try:
+        np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+    except KeyError as e:
+        print(f"Warning: Motion columns not found: {e}")
+        # Create empty motion file
+        np.savetxt(out_motion, np.zeros((len(regress_data), 6)), '%g')
+        print("Created empty motion file")
+    if regressors_names is None:
+        regressors_names = sorted(set(regress_data.columns) - set(motion_columns))
+
+    if regressors_names:
+        bunch_fields += ['regressor_names']
+        bunch_fields += ['regressors']
+
+    # Get unique conditions from the processed DataFrame
+    conditions = sorted(df_conditions['conditions'].unique().tolist())
+    print(f"Using processed conditions: {conditions}")
+    
+    runinfo = Bunch(
+        scans=in_file,
+        conditions=conditions,
+        **{k: [] for k in bunch_fields})
+
+    # Process each condition using the processed DataFrame
+    for condition in runinfo.conditions:
+        # Get all trials for this condition
+        condition_trials = df_conditions[df_conditions['conditions'] == condition]
+        
+        if len(condition_trials) > 0:
+            # Extract onsets, durations, and amplitudes
+            onsets = condition_trials['onset'].values
+            durations = condition_trials['duration'].values
+            
+            runinfo.onsets.append(np.round(onsets, 3).tolist())
+            runinfo.durations.append(np.round(durations, 3).tolist())
+            
+            if 'amplitudes' in condition_trials.columns:
+                amplitudes = condition_trials['amplitudes'].values
+                runinfo.amplitudes.append(np.round(amplitudes, 3).tolist())
+            else:
+                runinfo.amplitudes.append([amplitude] * len(condition_trials))
+                
+            print(f"Condition '{condition}': {len(condition_trials)} trials at onsets {onsets.tolist()}")
+        else:
+            # Fallback if no trials found for this condition
+            runinfo.onsets.append([])
+            runinfo.durations.append([])
+            runinfo.amplitudes.append([])
+            print(f"Condition '{condition}': No trials found")
+
+    if 'regressor_names' in bunch_fields:
+        runinfo.regressor_names = regressors_names
+        try:
+            runinfo.regressors = regress_data[regressors_names]
+        except KeyError:
+            regressors_names = list(set(regressors_names).intersection(
+                set(regress_data.columns)))
+            runinfo.regressors = regress_data[regressors_names]
+        runinfo.regressors = regress_data[regressors_names].fillna(0.0).values.T.tolist()
+
+
+    return [runinfo], str(out_motion)
+
 def _bids2nipypeinfo(in_file, events_file, regressors_file,
                      regressors_names=None,
                      motion_columns=None,
@@ -69,8 +189,18 @@ def _bids2nipypeinfo(in_file, events_file, regressors_file,
 
     out_motion = Path('motion.par').resolve()
 
+    # Import the function locally to ensure it's available
+    from utils import read_csv_with_detection
     regress_data = read_csv_with_detection(regressors_file)
-    np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+    
+    # Handle motion columns gracefully
+    try:
+        np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+    except KeyError as e:
+        print(f"Warning: Motion columns not found: {e}")
+        # Create empty motion file
+        np.savetxt(out_motion, np.zeros((len(regress_data), 6)), '%g')
+        print("Created empty motion file")
     if regressors_names is None:
         regressors_names = sorted(set(regress_data.columns) - set(motion_columns))
 
@@ -101,49 +231,30 @@ def _bids2nipypeinfo(in_file, events_file, regressors_file,
         **{k: [] for k in bunch_fields})
 
     for condition in runinfo.conditions:
-        if condition == 'CS-_first':
-            # First CS- trial: get the first occurrence
-            cs_events = events[events[condition_column] == 'CS-']
-            if len(cs_events) > 0:
-                first_cs = cs_events.iloc[0:1]  # Get first CS- trial
-                runinfo.onsets.append(np.round(first_cs.onset.values, 3).tolist())
-                runinfo.durations.append(np.round(first_cs.duration.values, 3).tolist())
-                if 'amplitudes' in events.columns:
-                    runinfo.amplitudes.append(np.round(first_cs.amplitudes.values, 3).tolist())
-                else:
-                    runinfo.amplitudes.append([amplitude] * len(first_cs))
+        # Get all trials for this condition
+        condition_trials = events[events[condition_column] == condition]
+        
+        if len(condition_trials) > 0:
+            # Extract onsets, durations, and amplitudes
+            onsets = condition_trials['onset'].values
+            durations = condition_trials['duration'].values
+            
+            runinfo.onsets.append(np.round(onsets, 3).tolist())
+            runinfo.durations.append(np.round(durations, 3).tolist())
+            
+            if 'amplitudes' in condition_trials.columns:
+                amplitudes = condition_trials['amplitudes'].values
+                runinfo.amplitudes.append(np.round(amplitudes, 3).tolist())
             else:
-                # Fallback if no CS- trials found
-                runinfo.onsets.append([])
-                runinfo.durations.append([])
-                runinfo.amplitudes.append([])
+                runinfo.amplitudes.append([amplitude] * len(condition_trials))
                 
-        elif condition == 'CS-_others':
-            # Other CS- trials: get all except the first
-            cs_events = events[events[condition_column] == 'CS-']
-            if len(cs_events) > 1:
-                other_cs = cs_events.iloc[1:]  # Get all CS- trials except first
-                runinfo.onsets.append(np.round(other_cs.onset.values, 3).tolist())
-                runinfo.durations.append(np.round(other_cs.duration.values, 3).tolist())
-                if 'amplitudes' in events.columns:
-                    runinfo.amplitudes.append(np.round(other_cs.amplitudes.values, 3).tolist())
-                else:
-                    runinfo.amplitudes.append([amplitude] * len(other_cs))
-            else:
-                # Fallback if only 1 CS- trial
-                runinfo.onsets.append([])
-                runinfo.durations.append([])
-                runinfo.amplitudes.append([])
-                
+            print(f"Condition '{condition}': {len(condition_trials)} trials at onsets {onsets.tolist()}")
         else:
-            # Regular condition: use original logic
-            event = events[events[condition_column].str.match(str(condition))]
-            runinfo.onsets.append(np.round(event.onset.values, 3).tolist())
-            runinfo.durations.append(np.round(event.duration.values, 3).tolist())
-            if 'amplitudes' in events.columns:
-                runinfo.amplitudes.append(np.round(event.amplitudes.values, 3).tolist())
-            else:
-                runinfo.amplitudes.append([amplitude] * len(event))
+            # Fallback if no trials found for this condition
+            runinfo.onsets.append([])
+            runinfo.durations.append([])
+            runinfo.amplitudes.append([])
+            print(f"Condition '{condition}': No trials found")
 
     if 'regressor_names' in bunch_fields:
         runinfo.regressor_names = regressors_names
@@ -180,6 +291,8 @@ def _bids2nipypeinfo_lss(in_file, events_file, regressors_file,
     events = read_csv_with_detection(events_file)
     print("LOADED EVENTS COLUMNS:", events.columns.tolist())
     print(events.head())
+    # Import the function locally to ensure it's available
+    from utils import read_csv_with_detection
     regress_data = read_csv_with_detection(regressors_file)
 
     # Locate the trial of interest by ID
@@ -334,8 +447,3 @@ def read_csv_with_detection(file_path, **kwargs):
     """
     separator = detect_csv_separator(file_path)
     return pd.read_csv(file_path, sep=separator, **kwargs)
-
-
-
-
-

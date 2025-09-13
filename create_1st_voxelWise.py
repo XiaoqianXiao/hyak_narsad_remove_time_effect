@@ -28,6 +28,9 @@ import nipype.pipeline.engine as pe
 import nipype.interfaces.utility as niu
 import subprocess
 
+# Import functions from first_level_workflows
+from first_level_workflows import extract_cs_conditions
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -75,7 +78,7 @@ RUN = []
 SPACE = ['MNI152NLin2009cAsym']
 
 # Output directory
-OUTPUT_DIR = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis')
+OUTPUT_DIR = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove_time_effect')
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
@@ -132,74 +135,93 @@ def build_query(participant_label=None, run=None, task=None):
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def get_df_trial_info(events_file):
+def get_condition_names_from_events(events_file):
     """
-    Load events file and return df_trial_info DataFrame.
+    Get condition names and create interesting contrasts from events file.
     
-    This function loads the events CSV file and returns it as df_trial_info
-    for use with the workflow functions. The DataFrame should contain
-    'trial_type', 'onset', and 'duration' columns.
+    This function loads an events file, processes it to group CS-, CSS, and CSR conditions,
+    and creates interesting contrasts for the NARSAD analysis.
     
     Args:
-        events_file (str): Path to events CSV file
+        events_file (str): Path to the events CSV file
     
     Returns:
-        pandas.DataFrame: df_trial_info with columns 'trial_type', 'onset', 'duration'
+        tuple: (contrasts, cs_conditions, css_conditions, csr_conditions, other_conditions, condition_names)
     """
-    try:
-        if os.path.exists(events_file):
-            # Use utility function for automatic separator detection
-            from utils import read_csv_with_detection
-            df_trial_info = read_csv_with_detection(events_file)
+
+    from utils import read_csv_with_detection
+    events_df = read_csv_with_detection(events_file)
+    
+    df_trial_info = events_df.copy()
+
+    if df_trial_info is None:
+        raise ValueError("df_trial_info is required")
+    
+    # Extract CS-, CSS, and CSR conditions with grouping
+    df_with_conditions, cs_conditions, css_conditions, csr_conditions, other_conditions = extract_cs_conditions(df_trial_info)
+    
+    # Use the conditions column for contrast generation
+    all_contrast_conditions = df_with_conditions['conditions'].unique().tolist()
+    condition_names = all_contrast_conditions.copy()
+    
+    # Check which conditions actually have trials
+    conditions_with_trials = {}
+    for condition in all_contrast_conditions:
+        trial_count = len(df_with_conditions[df_with_conditions['conditions'] == condition])
+        conditions_with_trials[condition] = trial_count
+        logger.info(f"Condition '{condition}': {trial_count} trials")
+    
+    # Define the interesting contrasts
+    interesting_contrasts = [
+        ("CS-_first_half_others > FIXATION_first_half", "first half Other CS- trials vs baseline"),
+        ("CSS_first_half_others > FIXATION_first_half", "first half Other CSS trials vs baseline"),
+        ("CSR_first_half_others > FIXATION_first_half", "first half Other CSR trials vs baseline"),
+        ("CSS_first_half_others > CSR_first_half_others", "first half Other CSS trials vs Other CSR trials"),
+        ("CSR_first_half_others > CSS_first_half_others", "first half Other CSR trials vs Other CSS trials"),
+        ("CSS_first_half_others > CS-_first_half_others", "first half Other CSS trials vs Other CS- trials"),
+        ("CSR_first_half_others > CS-_first_half_others", "first half Other CSR trials vs Other CS- trials"),
+        ("CS-_first_half_others > CSS_first_half_others", "first half Other CS- trials vs Other CSS trials"),
+        ("CS-_first_half_others > CSR_first_half_others", "first half Other CS- trials vs Other CSR trials"),
+        ("CS-_second_half_others > FIXATION_second_half", "second half Other CS- trials vs baseline"),
+        ("CSS_second_half_others > FIXATION_second_half ", "second half Other CSS trials vs baseline"),
+        ("CSR_second_half_others > FIXATION_second_half", "second half Other CSR trials vs baseline"),
+        ("CSS_second_half_others > CSR_second_half_others", "second half Other CSS trials vs Other CSR trials"),
+        ("CSR_second_half_others > CSS_second_half_others", "second half Other CSR trials vs Other CSS trials"),
+        ("CSS_second_half_others > CS-_second_half_others", "second half Other CSS trials vs Other CS- trials"),
+        ("CSR_second_half_others > CS-_second_half_others", "second half Other CSR trials vs Other CS- trials"),
+        ("CS-_second_half_others > CSS_second_half_others", "second half Other CS- trials vs Other CSS trials"),
+        ("CS-_second_half_others > CSR_second_half_others", "second half Other CS- trials vs Other CSR trials"),
+    ]
+    
+    contrasts = []
+    
+    for contrast_name, description in interesting_contrasts:
+        # Parse the contrast name (e.g., "CS-_others > FIXATION")
+        if ' > ' in contrast_name:
+            condition1, condition2 = contrast_name.split(' > ')
+            condition1 = condition1.strip()
+            condition2 = condition2.strip()
             
-            # Validate required columns
-            required_columns = ['trial_type', 'onset', 'duration']
-            missing_columns = [col for col in required_columns if col not in df_trial_info.columns]
-            
-            if missing_columns:
-                # Try alternative column names
-                column_mapping = {
-                    'trial_type': ['condition', 'event_type', 'type', 'stimulus', 'trial'],
-                    'onset': ['start_time', 'time', 'timestamp'],
-                    'duration': ['length', 'dur', 'duration_ms']
-                }
-                
-                for required_col in missing_columns:
-                    if required_col in column_mapping:
-                        for alt_col in column_mapping[required_col]:
-                            if alt_col in df_trial_info.columns:
-                                df_trial_info[required_col] = df_trial_info[alt_col]
-                                logger.info(f"Mapped column '{alt_col}' to '{required_col}'")
-                                break
-                
-                # Check if we still have missing columns
-                missing_columns = [col for col in required_columns if col not in df_trial_info.columns]
-                if missing_columns:
-                    logger.error(f"Missing required columns: {missing_columns}")
-                    logger.error(f"Available columns: {list(df_trial_info.columns)}")
-                    raise ValueError(f"Events file missing required columns: {missing_columns}")
-            
-            # Ensure data types are correct
-            df_trial_info['onset'] = pd.to_numeric(df_trial_info['onset'], errors='coerce')
-            df_trial_info['duration'] = pd.to_numeric(df_trial_info['duration'], errors='coerce')
-            
-            # Remove any rows with NaN values in required columns
-            df_trial_info = df_trial_info.dropna(subset=required_columns)
-            
-            logger.info(f"Successfully loaded df_trial_info: {df_trial_info.shape}")
-            logger.info(f"Columns: {list(df_trial_info.columns)}")
-            logger.info(f"Trial types: {sorted(df_trial_info['trial_type'].unique())}")
-            logger.info(f"Time range: {df_trial_info['onset'].min():.1f} - {df_trial_info['onset'].max():.1f} seconds")
-            
-            return df_trial_info
-            
+            # Check if both conditions exist AND have trials
+            if (condition1 in all_contrast_conditions and condition2 in all_contrast_conditions and
+                conditions_with_trials.get(condition1, 0) > 0 and conditions_with_trials.get(condition2, 0) > 0):
+                contrast = (contrast_name, 'T', [condition1, condition2], [1, -1])
+                contrasts.append(contrast)
+                logger.info(f"Added contrast: {contrast_name} - {description}")
+            else:
+                missing_conditions = []
+                if condition1 not in all_contrast_conditions or conditions_with_trials.get(condition1, 0) == 0:
+                    missing_conditions.append(condition1)
+                if condition2 not in all_contrast_conditions or conditions_with_trials.get(condition2, 0) == 0:
+                    missing_conditions.append(condition2)
+                logger.warning(f"Contrast {contrast_name}: conditions {missing_conditions} missing or have no trials")
         else:
-            logger.error(f"Events file does not exist: {events_file}")
-            raise FileNotFoundError(f"Events file not found: {events_file}")
-            
-    except Exception as e:
-        logger.error(f"Could not load df_trial_info from events file {events_file}: {e}")
-        raise
+            logger.warning(f"Invalid contrast format: {contrast_name}")
+    
+    logger.info(f"Created {len(contrasts)} interesting contrasts")
+    
+    return contrasts, cs_conditions, css_conditions, csr_conditions, other_conditions, condition_names, df_with_conditions
+
 
 def create_workflow_config():
     """
@@ -214,8 +236,7 @@ def create_workflow_config():
         'brightness_threshold': 1000,
         'high_pass_cutoff': 100,
         'use_derivatives': True,
-        'model_serial_correlations': True,
-        'contrast_type': 'interesting'
+        'model_serial_correlations': True
     }
     
     logger.info(f"Created workflow configuration: {config}")
@@ -317,14 +338,14 @@ def create_slurm_script(sub, inputs, work_dir, output_dir, task, container_path)
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=40G
 #SBATCH --time=2:00:00
-#SBATCH --output=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel_timeEffect/{task}_sub_{sub}_%j.out
-#SBATCH --error=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel_timeEffect/{task}_sub_{sub}_%j.err
+#SBATCH --output=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel/{task}_sub_{sub}_%j.out
+#SBATCH --error=/gscratch/scrubbed/fanglab/xiaoqian/NARSAD/work_flows/firstLevel/{task}_sub_{sub}_%j.err
 
 module load apptainer
 apptainer exec \\
     -B /gscratch/fang:/data \\
     -B /gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir \\
-    -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/create_1st_voxelWise.py:/app/create_1st_voxelWise.py \\
+    -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove:/app \\
     {container_path} \\
     python3 /app/create_1st_voxelWise.py --subject {sub} --task {task}
 """
@@ -356,39 +377,38 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
     """
     try:
         # Import workflows
-        from first_level_workflows import first_level_wf, first_level_wf_LSS
+        from first_level_workflows import first_level_wf
         
         # Get workflow configuration
         config = create_workflow_config()
         
-        # Get df_trial_info from events file
+        # Get condition names and contrasts from events file
         events_file = inputs[sub]['events']
-        df_trial_info = get_df_trial_info(events_file)
+        contrasts, cs_conditions, css_conditions, csr_conditions, other_conditions, condition_names, df_with_conditions = get_condition_names_from_events(events_file)
         
         logger.info(f"Processing subject {sub}, task {task}")
-        logger.info(f"df_trial_info shape: {df_trial_info.shape}")
-        logger.info(f"Trial types: {sorted(df_trial_info['trial_type'].unique())}")
         logger.info(f"Workflow config: {config}")
         
-        # Create the workflow
+        # Create the workflow with processed DataFrame
         workflow = first_level_wf(
             in_files=inputs,
             output_dir=output_dir,
-            df_trial_info=df_trial_info,  # Pass df_trial_info instead of condition_names
-            contrast_type=config['contrast_type'],
+            condition_names=condition_names,
+            contrasts=contrasts,
             fwhm=config['fwhm'],
             brightness_threshold=config['brightness_threshold'],
             high_pass_cutoff=config['high_pass_cutoff'],
             use_smoothing=config['use_smoothing'],
             use_derivatives=config['use_derivatives'],
-            model_serial_correlations=config['model_serial_correlations']
+            model_serial_correlations=config['model_serial_correlations'],
+            df_conditions=df_with_conditions
         )
         
         # Set workflow base directory
         workflow.base_dir = os.path.join(work_dir, f'sub_{sub}')
         
         # Create output directory for this subject
-        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
+        subject_output_dir = os.path.join(output_dir, 'firstLevel', task, f'sub-{sub}')
         Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Running workflow for subject {sub}, task {task}")
@@ -432,7 +452,7 @@ def process_single_subject(args, layout, query):
             task = entities['task']
             
             # Create working directory
-            work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel_timeEffect/{task}')
+            work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel/{task}')
             Path(work_dir).mkdir(parents=True, exist_ok=True)
             
             try:
@@ -469,7 +489,7 @@ def generate_slurm_scripts(layout, query):
         task = entities['task']
         
         # Create working directory
-        work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel_timeEffect/{task}')
+        work_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, f'work_flows/firstLevel/{task}')
         Path(work_dir).mkdir(parents=True, exist_ok=True)
         
         try:
