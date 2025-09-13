@@ -182,15 +182,15 @@ def get_condition_names_from_events(events_file):
         ("CSR_first_half_others > CS-_first_half_others", "first half Other CSR trials vs Other CS- trials"),
         ("CS-_first_half_others > CSS_first_half_others", "first half Other CS- trials vs Other CSS trials"),
         ("CS-_first_half_others > CSR_first_half_others", "first half Other CS- trials vs Other CSR trials"),
-        ("CS-_second_half_others > FIXATION_second_half", "second half Other CS- trials vs baseline"),
-        ("CSS_second_half_others > FIXATION_second_half ", "second half Other CSS trials vs baseline"),
-        ("CSR_second_half_others > FIXATION_second_half", "second half Other CSR trials vs baseline"),
-        ("CSS_second_half_others > CSR_second_half_others", "second half Other CSS trials vs Other CSR trials"),
-        ("CSR_second_half_others > CSS_second_half_others", "second half Other CSR trials vs Other CSS trials"),
-        ("CSS_second_half_others > CS-_second_half_others", "second half Other CSS trials vs Other CS- trials"),
-        ("CSR_second_half_others > CS-_second_half_others", "second half Other CSR trials vs Other CS- trials"),
-        ("CS-_second_half_others > CSS_second_half_others", "second half Other CS- trials vs Other CSS trials"),
-        ("CS-_second_half_others > CSR_second_half_others", "second half Other CS- trials vs Other CSR trials"),
+        ("CS-_second_half > FIXATION_second_half", "second half Other CS- trials vs baseline"),
+        ("CSS_second_half > FIXATION_second_half ", "second half Other CSS trials vs baseline"),
+        ("CSR_second_half > FIXATION_second_half", "second half Other CSR trials vs baseline"),
+        ("CSS_second_half > CSR_second_half", "second half Other CSS trials vs Other CSR trials"),
+        ("CSR_second_half > CSS_second_half", "second half Other CSR trials vs Other CSS trials"),
+        ("CSS_second_half > CS-_second_half", "second half Other CSS trials vs Other CS- trials"),
+        ("CSR_second_half > CS-_second_half", "second half Other CSR trials vs Other CS- trials"),
+        ("CS-_second_half > CSS_second_half", "second half Other CS- trials vs Other CSS trials"),
+        ("CS-_second_half > CSR_second_half", "second half Other CS- trials vs Other CSR trials"),
     ]
     
     contrasts = []
@@ -255,9 +255,9 @@ def get_events_file_path(sub, task):
     """
     # Handle special case for N202 phase3
     if sub == 'N202' and task == 'phase3':
-        events_file = os.path.join(BEHAV_DIR, 'single_trial_task-Narsad_phase-3_sub-202_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, 'task-NARSAD_phase-3_sub-202_half_events.csv')
     else:
-        events_file = os.path.join(BEHAV_DIR, f'single_trial_task-Narsad_{task}_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, f'task-Narsad_{task}_half_events.csv')
     
     logger.info(f"Using events file: {events_file}")
     return events_file
