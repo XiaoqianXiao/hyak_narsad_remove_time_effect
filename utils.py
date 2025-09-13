@@ -466,6 +466,10 @@ def read_csv_with_detection(file_path, **kwargs):
         
         # If we got multiple columns, we're good
         if len(df.columns) > 1:
+            # Convert numeric columns for comma-separated data too
+            for col in df.columns:
+                if col in ['onset', 'duration', 'trial_ID']:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
             return df
         
         # If we got a single column, check if it contains tab-separated values
@@ -491,6 +495,12 @@ def read_csv_with_detection(file_path, **kwargs):
                 for col in df.columns:
                     if col in ['onset', 'duration', 'trial_ID']:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
+                    # Also convert any column that looks numeric
+                    elif col not in ['trial_type', 'condition', 'event_type', 'type', 'stimulus', 'trial']:
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                        except:
+                            pass
                 
                 return df
         
@@ -499,6 +509,10 @@ def read_csv_with_detection(file_path, **kwargs):
         
         # If we got multiple columns, we're good
         if len(df.columns) > 1:
+            # Convert numeric columns for tab-separated data too
+            for col in df.columns:
+                if col in ['onset', 'duration', 'trial_ID']:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
             return df
         
         # If still single column, try other separators
@@ -506,6 +520,10 @@ def read_csv_with_detection(file_path, **kwargs):
             try:
                 df = pd.read_csv(file_path, sep=sep, **kwargs)
                 if len(df.columns) > 1:
+                    # Convert numeric columns for other separators too
+                    for col in df.columns:
+                        if col in ['onset', 'duration', 'trial_ID']:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
                     return df
             except:
                 continue
@@ -516,4 +534,9 @@ def read_csv_with_detection(file_path, **kwargs):
     except Exception as e:
         # Fallback to automatic separator detection
         separator = detect_csv_separator(file_path)
-        return pd.read_csv(file_path, sep=separator, **kwargs)
+        df = pd.read_csv(file_path, sep=separator, **kwargs)
+        # Convert numeric columns for fallback case too
+        for col in df.columns:
+            if col in ['onset', 'duration', 'trial_ID']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        return df
