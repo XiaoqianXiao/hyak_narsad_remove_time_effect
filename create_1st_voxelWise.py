@@ -345,7 +345,7 @@ module load apptainer
 apptainer exec \\
     -B /gscratch/fang:/data \\
     -B /gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir \\
-    -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove:/app \\
+    -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect:/app \\
     {container_path} \\
     python3 /app/create_1st_voxelWise.py --subject {sub} --task {task}
 """
