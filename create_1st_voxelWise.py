@@ -255,9 +255,9 @@ def get_events_file_path(sub, task):
     """
     # Handle special case for N202 phase3
     if sub == 'N202' and task == 'phase3':
-        events_file = os.path.join(BEHAV_DIR, 'task-NARSAD_phase-3_sub-202_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, 'single_trial_task-Narsad_phase-3_sub-202_half_events.csv')
     else:
-        events_file = os.path.join(BEHAV_DIR, f'task-Narsad_{task}_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, f'single_trial_task-Narsad_{task}_half_events.csv')
     
     logger.info(f"Using events file: {events_file}")
     return events_file

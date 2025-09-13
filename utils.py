@@ -445,5 +445,60 @@ def read_csv_with_detection(file_path, **kwargs):
     Returns:
         pandas.DataFrame: Loaded CSV data
     """
-    separator = detect_csv_separator(file_path)
-    return pd.read_csv(file_path, sep=separator, **kwargs)
+    try:
+        # First try with comma separator (most common)
+        df = pd.read_csv(file_path, sep=',', **kwargs)
+        
+        # If we got multiple columns, we're good
+        if len(df.columns) > 1:
+            return df
+        
+        # If we got a single column, check if it contains tab-separated values
+        if len(df.columns) == 1:
+            column_name = df.columns[0]
+            
+            # Check if it's tab-separated data in a single column
+            if '\t' in str(column_name) or (len(df) > 0 and '\t' in str(df.iloc[0, 0])):
+                # This is tab-separated data in a single column
+                if '\t' in str(column_name):
+                    # Header contains tabs - split it
+                    header_row = str(column_name).replace('"', '').split('\t')
+                    # Split all data rows
+                    df = df[column_name].astype(str).str.replace('"', '').str.split('\t', expand=True)
+                    df.columns = header_row
+                else:
+                    # Data contains tabs - use first row as header
+                    df = df[column_name].astype(str).str.replace('"', '').str.split('\t', expand=True)
+                    df.columns = df.iloc[0]
+                    df = df.drop(df.index[0]).reset_index(drop=True)
+                
+                # Convert numeric columns
+                for col in df.columns:
+                    if col in ['onset', 'duration', 'trial_ID']:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                return df
+        
+        # If comma didn't work, try tab separator
+        df = pd.read_csv(file_path, sep='\t', **kwargs)
+        
+        # If we got multiple columns, we're good
+        if len(df.columns) > 1:
+            return df
+        
+        # If still single column, try other separators
+        for sep in [';', '|', ' ']:
+            try:
+                df = pd.read_csv(file_path, sep=sep, **kwargs)
+                if len(df.columns) > 1:
+                    return df
+            except:
+                continue
+        
+        # If nothing worked, return the original
+        return df
+        
+    except Exception as e:
+        # Fallback to automatic separator detection
+        separator = detect_csv_separator(file_path)
+        return pd.read_csv(file_path, sep=separator, **kwargs)
