@@ -81,7 +81,11 @@ def _bids2nipypeinfo_from_df(in_file, df_conditions, regressors_file,
     
     # Handle motion columns gracefully
     try:
-        np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+        # Convert motion columns to numeric, handling any string values
+        motion_data = regress_data[motion_columns].apply(pd.to_numeric, errors='coerce')
+        # Fill any NaN values with 0
+        motion_data = motion_data.fillna(0)
+        np.savetxt(out_motion, motion_data.values, '%g')
     except KeyError as e:
         print(f"Warning: Motion columns not found: {e}")
         # Create empty motion file
@@ -130,6 +134,10 @@ def _bids2nipypeinfo_from_df(in_file, df_conditions, regressors_file,
             runinfo.amplitudes.append([])
             print(f"Condition '{condition}': No trials found")
 
+    if regressors_names:
+        bunch_fields += ['regressor_names']
+        bunch_fields += ['regressors']
+
     if 'regressor_names' in bunch_fields:
         runinfo.regressor_names = regressors_names
         try:
@@ -139,7 +147,6 @@ def _bids2nipypeinfo_from_df(in_file, df_conditions, regressors_file,
                 set(regress_data.columns)))
             runinfo.regressors = regress_data[regressors_names]
         runinfo.regressors = regress_data[regressors_names].fillna(0.0).values.T.tolist()
-
 
     return [runinfo], str(out_motion)
 
@@ -195,7 +202,11 @@ def _bids2nipypeinfo(in_file, events_file, regressors_file,
     
     # Handle motion columns gracefully
     try:
-        np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+        # Convert motion columns to numeric, handling any string values
+        motion_data = regress_data[motion_columns].apply(pd.to_numeric, errors='coerce')
+        # Fill any NaN values with 0
+        motion_data = motion_data.fillna(0)
+        np.savetxt(out_motion, motion_data.values, '%g')
     except KeyError as e:
         print(f"Warning: Motion columns not found: {e}")
         # Create empty motion file
@@ -305,7 +316,11 @@ def _bids2nipypeinfo_lss(in_file, events_file, regressors_file,
     other_trials = events[events['trial_ID'] != trial_ID]
 
     out_motion = Path('motion.par').resolve()
-    np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+    # Convert motion columns to numeric, handling any string values
+    motion_data = regress_data[motion_columns].apply(pd.to_numeric, errors='coerce')
+    # Fill any NaN values with 0
+    motion_data = motion_data.fillna(0)
+    np.savetxt(out_motion, motion_data.values, '%g')
 
     if regressors_names is None:
         regressors_names = sorted(set(regress_data.columns) - set(motion_columns))

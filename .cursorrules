@@ -1,0 +1,196 @@
+# Cursor AI Configuration for NARSAD fMRI Analysis Project
+
+## Project Overview
+This is a neuroimaging analysis project for the NARSAD study, focusing on first-level fMRI analysis using Nipype and FSL. The project includes workflows for processing fMRI data, extracting conditions from trial information, and generating contrasts.
+
+## AI Assistant Expertise
+The AI assistant should work as an expert in neural imaging data analysis with FSL and Nipype, providing:
+- Deep understanding of fMRI preprocessing and analysis pipelines
+- Expertise in FSL tools (FEAT, FILM, BET, FLIRT, etc.)
+- Proficiency in Nipype workflow construction and optimization
+- Knowledge of GLM modeling, contrast generation, and statistical analysis
+- Understanding of neuroimaging data formats (BIDS, NIfTI, etc.)
+- Experience with first-level and group-level analysis workflows
+
+## Key Files and Their Purposes
+
+### Core Analysis Scripts
+- `create_1st_voxelWise.py`: Main orchestration script for first-level fMRI analysis
+- `first_level_workflows.py`: Defines Nipype workflows for fMRI processing
+- `utils.py`: Utility functions for data processing and BIDS conversion
+
+### Key Functions to Understand
+- `extract_cs_conditions()`: Processes trial data to separate first trials from others for CS-, CSS, and CSR conditions
+- `_bids2nipypeinfo_from_df()`: Converts processed DataFrame to FSL-compatible format
+- `get_condition_names_from_events()`: Generates contrasts and condition names from events files
+- `first_level_wf()`: Main workflow function for first-level analysis
+
+## Development Guidelines
+
+### Code Style
+- Follow PEP 8 Python style guidelines
+- Use descriptive variable names
+- Add comprehensive docstrings for functions
+- Include type hints where appropriate
+
+### Error Handling
+- Always handle missing regressor columns gracefully
+- Use try-except blocks for file operations
+- Provide informative error messages
+- Log important processing steps
+
+### Data Processing
+- Validate input DataFrames before processing
+- Handle missing motion columns by creating empty files
+- Ensure regressor names and data arrays are consistent
+- Use local imports for functions passed to Nipype
+
+### Testing
+- Test individual functions with mock data
+- Verify workflow creation and configuration
+- Test error handling scenarios
+- Ensure compatibility between scripts
+
+## Common Patterns
+
+### Regressor Handling
+```python
+# Always handle missing regressors gracefully
+try:
+    runinfo.regressors = regress_data[regressors_names]
+except KeyError:
+    regressors_names = list(set(regressors_names).intersection(
+        set(regress_data.columns)))
+    runinfo.regressors = regress_data[regressors_names]
+```
+
+### Motion Column Handling
+```python
+# Handle missing motion columns gracefully
+try:
+    np.savetxt(out_motion, regress_data[motion_columns].values, '%g')
+except KeyError as e:
+    print(f"Warning: Motion columns not found: {e}")
+    np.savetxt(out_motion, np.zeros((len(regress_data), 6)), '%g')
+```
+
+### Local Imports for Nipype
+```python
+# Always use local imports for functions passed to Nipype
+from utils import read_csv_with_detection
+```
+
+### Container Testing Commands
+```bash
+# Run container for local testing
+apptainer exec \
+    -B /Users/xiaoqianxiao/PycharmProjects/hyak_narsad_remove:/app \
+    /Users/xiaoqianxiao/PycharmProjects/hyak_narsad_remove/narsad-fmri_1st_level_1.0.sif \
+    python3 /app/your_script.py
+
+# Test specific script
+apptainer exec \
+    -B .:/app \
+    ./narsad-fmri_1st_level_1.0.sif \
+    python3 /app/test_script.py
+```
+
+## Data Structures
+
+### Trial Information DataFrame
+- `trial_type`: Original trial type (CS-, CSS, CSR, FIXATION, etc.)
+- `onset`: Trial onset time in seconds
+- `duration`: Trial duration in seconds
+- `conditions`: Processed condition name (CS-_first, CS-_others, etc.)
+
+### Contrast Format
+- Tuple format: (name, type, conditions, weights)
+- Example: ("CS-_others > FIXATION", 'T', ['CS-_others', 'FIXATION'], [1, -1])
+
+### Regressor Configuration
+- Preferred regressors: dvars, framewise_displacement, a_comp_cor_00-05, cosine00-03
+- Motion columns: trans_x, trans_y, trans_z, rot_x, rot_y, rot_z
+
+### Event File Paths (Test Purpose Only)
+- Phase 2 events: `/data/NARSAD/MRI/source_data/behav/task-Narsad_phase2_half_events.csv`
+- Phase 3 events: `/data/NARSAD/MRI/source_data/behav/task-Narsad_phase2_half_events.csv`
+- Special case: N202 phase3 uses `task-Narsad_phase-3_sub-202_half_events.csv`
+- Local test files: `/Users/xiaoqianxiao/projects/NARSAD/MRI/source_data/behav/task-Narsad_phase2_events.csv`, `/Users/xiaoqianxiao/projects/NARSAD/MRI/source_data/behav/task-Narsad_phase3_events.csv`
+- Note: These paths are for testing and development purposes only
+
+## Environment Setup
+- Uses FSL for neuroimaging analysis
+- Nipype for workflow management
+- Pandas for data manipulation
+- Apptainer/Singularity for containerization
+- SLURM for job scheduling
+
+## Deployment Environment
+- **Supercomputer**: Scripts run on HPC cluster with SLURM job scheduler
+- **Containerization**: Uses Apptainer/Singularity containers for reproducible execution
+- **Container Image**: `narsad-fmri_1st_level_1.0.sif`
+- **Bind Mounts**: 
+  - `/gscratch/fang:/data` (data access)
+  - `/gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir` (working directory)
+  - `/gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect:/app` (code)
+- **Execution**: Scripts run inside container with isolated environment
+- **Resource Limits**: 4 CPUs, 40GB RAM, 2-hour time limit per job
+
+## Local Testing Environment
+- **Container for Testing**: `/Users/xiaoqianxiao/PycharmProjects/hyak_narsad_remove/narsad-fmri_1st_level_1.0.sif`
+- **Mount Requirement**: All scripts in current directory must be mounted to `/app` before use
+- **Usage**: Use container for testing with same environment as production
+- **Path Mapping**: Current directory → `/app` inside container
+
+## Common Issues and Solutions
+
+### Import Errors
+- Use local imports within functions passed to Nipype
+- Ensure all dependencies are available in the execution environment
+
+### Regressor Mismatches
+- Always validate regressor names against available columns
+- Handle missing regressors by using only available ones
+- Ensure consistent array shapes
+
+### Directory Creation
+- Avoid creating directories at module import time
+- Move directory creation to runtime functions
+- Handle read-only filesystem scenarios
+
+### Supercomputer Considerations
+- **Container Environment**: Code runs in isolated container with limited access
+- **File System**: Some paths may be read-only, handle gracefully
+- **Resource Constraints**: Limited memory and CPU, optimize accordingly
+- **Job Scheduling**: SLURM manages job execution and resource allocation
+- **Error Handling**: Robust error handling for network and filesystem issues
+- **Logging**: Important for debugging in remote environment
+
+## Testing Approach
+- Create mock data that mirrors production scenarios
+- Test both successful and error cases
+- Verify integration between different scripts
+- Test with missing data scenarios
+
+## Production Considerations
+- **Containerized Execution**: Scripts run in Apptainer containers on supercomputer
+- **SLURM Job Management**: Jobs are submitted and managed by SLURM scheduler
+- **File System Constraints**: Handle read-only filesystem and bind mount limitations
+- **Resource Management**: Optimize for 4 CPU cores and 40GB RAM limits
+- **Error Handling**: Robust error handling for missing data and network issues
+- **Logging**: Comprehensive logging for debugging in remote environment
+- **Timeout Handling**: 2-hour job time limit requires efficient processing
+
+## File Organization
+- Keep utility functions in `utils.py`
+- Main workflows in `first_level_workflows.py`
+- Orchestration scripts in `create_1st_voxelWise.py`
+- Test files should be temporary and cleaned up
+
+## Best Practices
+- Always validate input data
+- Use descriptive logging
+- Handle edge cases gracefully
+- Maintain backward compatibility
+- Document any changes to data structures
+- Test thoroughly before production deployment
