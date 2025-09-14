@@ -255,9 +255,9 @@ def get_events_file_path(sub, task):
     """
     # Handle special case for N202 phase3
     if sub == 'N202' and task == 'phase3':
-        events_file = os.path.join(BEHAV_DIR, 'task-NARSAD_phase-3_sub-202_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, 'task-NARSAD_phase-3_sub-202_events.csv')
     else:
-        events_file = os.path.join(BEHAV_DIR, f'task-Narsad_{task}_half_events.csv')
+        events_file = os.path.join(BEHAV_DIR, f'task-Narsad_{task}_events.csv')
     
     logger.info(f"Using events file: {events_file}")
     return events_file
@@ -364,7 +364,7 @@ apptainer exec \\
 # WORKFLOW EXECUTION
 # =============================================================================
 
-def run_subject_workflow(sub, inputs, work_dir, output_dir, task, entities=None):
+def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
     """
     Run first-level workflow for a single subject.
     
@@ -374,7 +374,6 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task, entities=None)
         work_dir (str): Working directory
         output_dir (str): Output directory
         task (str): Task name
-        entities (dict): BIDS entities for proper file naming
     """
     try:
         # Import workflows
@@ -390,14 +389,10 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task, entities=None)
         logger.info(f"Processing subject {sub}, task {task}")
         logger.info(f"Workflow config: {config}")
         
-        # Create subject-specific output directory
-        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
-        Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
-        
         # Create the workflow with processed DataFrame
         workflow = first_level_wf(
             in_files=inputs,
-            output_dir=subject_output_dir,
+            output_dir=output_dir,
             condition_names=condition_names,
             contrasts=contrasts,
             fwhm=config['fwhm'],
@@ -406,12 +401,15 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task, entities=None)
             use_smoothing=config['use_smoothing'],
             use_derivatives=config['use_derivatives'],
             model_serial_correlations=config['model_serial_correlations'],
-            df_conditions=df_with_conditions,
-            bids_entities=entities
+            df_conditions=df_with_conditions
         )
         
         # Set workflow base directory
         workflow.base_dir = os.path.join(work_dir, f'sub_{sub}')
+        
+        # Create output directory for this subject
+        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
+        Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Running workflow for subject {sub}, task {task}")
         logger.info(f"Workflow base directory: {workflow.base_dir}")
@@ -462,7 +460,7 @@ def process_single_subject(args, layout, query):
                 inputs = create_subject_inputs(sub, part, layout, query)
                 
                 logger.info(f"Running first-level analysis for subject {sub}, task {task}")
-                run_subject_workflow(sub, inputs, work_dir, OUTPUT_DIR, task, entities)
+                run_subject_workflow(sub, inputs, work_dir, OUTPUT_DIR, task)
                 
             except Exception as e:
                 logger.error(f"Failed to process subject {sub}: {e}")
