@@ -226,19 +226,13 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
         # Create the target directory structure manually
         target_dir = os.path.join(output_dir, f"ses-{bids_entities.get('session', 'unknown')}", 'func')
         
-        # Create substitutions to rename files to BIDS format
-        substitutions = [
-            ('cope1.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope1_bold.nii.gz"),
-            ('cope2.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope2_bold.nii.gz"),
-            ('cope3.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope3_bold.nii.gz"),
-            ('cope4.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope4_bold.nii.gz"),
-            ('cope5.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope5_bold.nii.gz"),
-            ('varcope1.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope1_bold.nii.gz"),
-            ('varcope2.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope2_bold.nii.gz"),
-            ('varcope3.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope3_bold.nii.gz"),
-            ('varcope4.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope4_bold.nii.gz"),
-            ('varcope5.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope5_bold.nii.gz"),
-        ]
+        # Create comprehensive substitutions for all possible contrast numbers (up to 20)
+        substitutions = []
+        for i in range(1, 21):  # Support up to 20 contrasts
+            substitutions.extend([
+                (f'cope{i}.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope{i}_bold.nii.gz"),
+                (f'varcope{i}.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope{i}_bold.nii.gz"),
+            ])
         
         ds_copes = [
             pe.Node(DataSink(
@@ -284,10 +278,10 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     # Add data sink connections
     for i in range(1, n_contrasts + 1):
         if bids_entities:
-            # For BIDS naming, connect directly to in_file and let substitutions handle renaming
+            # For BIDS naming, use @ syntax to avoid subdirectories and let substitutions handle renaming
             connections.extend([
-                (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
-                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
+                (feat_select, ds_copes[i - 1], [(f'cope{i}', f'cope{i}.@')]),
+                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', f'varcope{i}.@')])
             ])
         else:
             # For simple naming, use @ syntax to avoid subdirectories
