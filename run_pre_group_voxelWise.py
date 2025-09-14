@@ -72,9 +72,8 @@ def get_workflow_crash_dir(workflow_dir):
         logger.info(f"Using workflow directory as crash directory: {workflow_dir}")
         return workflow_dir
 
-# Set Nipype to use relative crash directories by default
-# This ensures crash files are written relative to workflow directories
-nipype.config.set('execution', 'crash_dir', '.')
+# Set Nipype to use /tmp for crash directories to avoid read-only filesystem issues
+nipype.config.set('execution', 'crash_dir', '/tmp/nipype_crashes')
 nipype.config.set('execution', 'crashfile_format', 'txt')
 nipype.config.set('execution', 'remove_unnecessary_outputs', 'false')
 
@@ -100,7 +99,7 @@ PROJECT_NAME = 'NARSAD'
 DATA_DIR = os.path.join(ROOT_DIR, PROJECT_NAME, 'MRI')
 DERIVATIVES_DIR = os.path.join(DATA_DIR, 'derivatives')
 SCRUBBED_DIR = os.getenv('SCRUBBED_DIR', '/scrubbed_dir')
-CONTAINER_PATH = "/gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/narsad-fmri_1st_level_1.0.sif"
+CONTAINER_PATH = "/gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove/narsad-fmri_1st_level_1.0.sif"
 
 # Define standard reference image (MNI152 template from FSL)
 GROUP_MASK = str(tpl_get('MNI152NLin2009cAsym', resolution=2, desc='brain', suffix='mask'))
@@ -139,17 +138,17 @@ def get_contrast_range(task):
     """
     if task == 'phase2':
         # Phase 2: 9 interesting contrasts (focused set)
-        return list(range(1, 19))
+        return list(range(1, 10))
     elif task == 'phase3':
         # Phase 3: 9 interesting contrasts (focused set)
-        return list(range(1, 19))
+        return list(range(1, 10))
     else:
         # Default fallback
-        return list(range(1, 19))
+        return list(range(1, 10))
 
 # Default contrast range (will be overridden per task)
 # This is a fallback - actual ranges are determined dynamically per task
-CONTRAST_RANGE = list(range(1, 19))  # Contrasts 1-9 (fallback)
+CONTRAST_RANGE = list(range(1, 10))  # Contrasts 1-9 (fallback)
 
 # =============================================================================
 # DATA LOADING FUNCTIONS
@@ -378,7 +377,7 @@ def collect_task_data(task, contrast, subject_list, glayout):
     
     for sub in subject_list:
         try:
-            # First try BIDS layout approach
+            # Get cope file
             cope_file = glayout.get(
                 subject=sub, 
                 task=task, 
@@ -387,6 +386,7 @@ def collect_task_data(task, contrast, subject_list, glayout):
                 return_type='file'
             )
             
+            # Get varcope file
             varcope_file = glayout.get(
                 subject=sub, 
                 task=task, 
@@ -395,14 +395,9 @@ def collect_task_data(task, contrast, subject_list, glayout):
                 return_type='file'
             )
             
-            # If BIDS layout doesn't find files, try direct file search in cope* subdirectories
-            if not cope_file or not varcope_file or len(cope_file) == 0 or len(varcope_file) == 0:
-                logger.info(f"BIDS layout didn't find files for sub-{sub}, task-{task}, cope{contrast}, trying direct search...")
-                cope_file, varcope_file = find_files_in_cope_subdirs(sub, task, contrast)
-            
             if cope_file and varcope_file:
-                copes.append(cope_file[0] if isinstance(cope_file, list) else cope_file)
-                varcopes.append(varcope_file[0] if isinstance(varcope_file, list) else varcope_file)
+                copes.append(cope_file[0])
+                varcopes.append(varcope_file[0])
             else:
                 logger.warning(f"Missing files for task-{task}, sub-{sub}, cope{contrast}")
                 
@@ -411,99 +406,6 @@ def collect_task_data(task, contrast, subject_list, glayout):
             continue
     
     return copes, varcopes
-
-def find_files_in_cope_subdirs(sub, task, contrast):
-    """
-    Find cope and varcope files in cope* subdirectories.
-    
-    Args:
-        sub (str): Subject ID
-        task (str): Task name
-        contrast (int): Contrast number
-    
-    Returns:
-        tuple: (cope_file_path, varcope_file_path) or (None, None) if not found
-    """
-    try:
-        # Construct the base path for the subject
-        base_path = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/firstLevel_timeEffect', task, f'sub-{sub}')
-        logger.info(f"Searching for files in: {base_path}")
-        
-        if not os.path.exists(base_path):
-            logger.warning(f"Base path does not exist: {base_path}")
-            return None, None
-        
-        # Look for session directories
-        session_dirs = [d for d in os.listdir(base_path) if d.startswith('ses-') and os.path.isdir(os.path.join(base_path, d))]
-        logger.info(f"Found session directories: {session_dirs}")
-        
-        if not session_dirs:
-            logger.warning(f"No session directories found for sub-{sub} in {base_path}")
-            return None, None
-        
-        # Use the first session found (or you could modify this logic as needed)
-        session = session_dirs[0]
-        func_dir = os.path.join(base_path, session, 'func')
-        logger.info(f"Checking func directory: {func_dir}")
-        
-        if not os.path.exists(func_dir):
-            logger.warning(f"Func directory not found: {func_dir}")
-            return None, None
-        
-        # List contents of func directory
-        func_contents = os.listdir(func_dir)
-        logger.info(f"Func directory contents: {func_contents}")
-        
-        # Look for cope and varcope subdirectories
-        cope_subdir = os.path.join(func_dir, f'cope{contrast}')
-        varcope_subdir = os.path.join(func_dir, f'varcope{contrast}')
-        
-        logger.info(f"Looking for cope subdirectory: {cope_subdir}")
-        logger.info(f"Looking for varcope subdirectory: {varcope_subdir}")
-        
-        cope_file = None
-        varcope_file = None
-        
-        # Find cope file (BIDS format)
-        if os.path.exists(cope_subdir):
-            # Look for BIDS format files: sub-*_ses-*_task-*_space-*_desc-cope{contrast}_bold.nii*
-            cope_pattern = os.path.join(cope_subdir, f'*_desc-cope{contrast}_bold.nii*')
-            cope_files = glob.glob(cope_pattern)
-            logger.info(f"Found cope files (BIDS pattern): {cope_files}")
-            if cope_files:
-                cope_file = cope_files[0]
-            else:
-                # Fallback to simple pattern
-                cope_files = glob.glob(os.path.join(cope_subdir, f'cope{contrast}.nii*'))
-                logger.info(f"Found cope files (fallback): {cope_files}")
-                if cope_files:
-                    cope_file = cope_files[0]
-        else:
-            logger.warning(f"Cope subdirectory does not exist: {cope_subdir}")
-        
-        # Find varcope file (BIDS format)
-        if os.path.exists(varcope_subdir):
-            # Look for BIDS format files: sub-*_ses-*_task-*_space-*_desc-varcope{contrast}_bold.nii*
-            varcope_pattern = os.path.join(varcope_subdir, f'*_desc-varcope{contrast}_bold.nii*')
-            varcope_files = glob.glob(varcope_pattern)
-            logger.info(f"Found varcope files (BIDS pattern): {varcope_files}")
-            if varcope_files:
-                varcope_file = varcope_files[0]
-            else:
-                # Fallback to simple pattern
-                varcope_files = glob.glob(os.path.join(varcope_subdir, f'varcope{contrast}.nii*'))
-                logger.info(f"Found varcope files (fallback): {varcope_files}")
-                if varcope_files:
-                    varcope_file = varcope_files[0]
-        else:
-            logger.warning(f"Varcope subdirectory does not exist: {varcope_subdir}")
-        
-        logger.info(f"Final result: cope_file={cope_file}, varcope_file={varcope_file}")
-        return cope_file, varcope_file
-        
-    except Exception as e:
-        logger.error(f"Error finding files in cope subdirectories for sub-{sub}, task-{task}, cope{contrast}: {e}")
-        return None, None
 
 def filter_subjects_for_task(subject_list, task, df_behav):
     """
@@ -561,8 +463,9 @@ def run_data_preparation_workflow(task, contrast, group_info, copes, varcopes,
         # Set workflow parameters
         prepare_wf.base_dir = contrast_workflow_dir
         
-        # Set crash directory to be within the workflow directory
-        workflow_crash_dir = get_workflow_crash_dir(contrast_workflow_dir)
+        # Set crash directory to /tmp to avoid read-only filesystem issues
+        workflow_crash_dir = '/tmp/nipype_crashes'
+        os.makedirs(workflow_crash_dir, exist_ok=True)
         prepare_wf.config['execution']['crash_dir'] = workflow_crash_dir
         
         prepare_wf.inputs.inputnode.in_copes = copes
@@ -574,19 +477,41 @@ def run_data_preparation_workflow(task, contrast, group_info, copes, varcopes,
         # Set analysis-specific parameters
         # Note: use_guess parameter removed as it's not needed for design generation
         
-        # Clear any existing cache to avoid conflicts
+        # Clear Nipype cache to avoid file validation issues from stale cache files
         cache_dir = os.path.join(contrast_workflow_dir, prepare_wf.name)
         if os.path.exists(cache_dir):
             try:
+                import shutil
                 shutil.rmtree(cache_dir)
-                logger.info(f"Cleared existing cache: {cache_dir}")
+                logger.info(f"Cleared Nipype cache: {cache_dir}")
             except Exception as e:
-                logger.warning(f"Could not clear cache: {e}")
+                logger.warning(f"Could not clear Nipype cache: {e}")
+        
+        # Also clear any individual node caches that might cause TraitError
+        node_cache_dirs = [
+            'resample_copes',
+            'resample_varcopes', 
+            'rename_copes',
+            'rename_varcopes'
+        ]
+        for node_name in node_cache_dirs:
+            node_cache_dir = os.path.join(cache_dir, node_name)
+            if os.path.exists(node_cache_dir):
+                try:
+                    import shutil
+                    shutil.rmtree(node_cache_dir)
+                    logger.info(f"Cleared node cache: {node_cache_dir}")
+                except Exception as e:
+                    logger.warning(f"Could not clear node cache {node_name}: {e}")
         
         # Final crash directory setting to ensure it's correct
         prepare_wf.config['execution']['crash_dir'] = workflow_crash_dir
         
+        # Force removal of unnecessary outputs to avoid cache conflicts
+        prepare_wf.config['execution']['remove_unnecessary_outputs'] = True
+        
         logger.info(f"Workflow crash directory set to: {workflow_crash_dir}")
+        logger.info("Nipype cache cleared and configured to avoid file validation errors")
         
         logger.info(f"Running data preparation for task-{task}, contrast-{contrast}")
         prepare_wf.run(plugin='MultiProc', plugin_args={'n_procs': 4})
@@ -813,7 +738,7 @@ Examples:
             logger.info(f"Using custom output directory as base: {base_results_dir}")
         else:
             # Standard base: groupLevel/whole_brain
-            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/groupLevel_timeEffect/whole_brain')
+            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis/groupLevel/whole_brain')
             logger.info(f"Using default base directory: {base_results_dir}")
         
         # Always add data source components to the base directory
@@ -840,7 +765,7 @@ Examples:
             workflow_dir = args.workflow_dir
         else:
             # Standard base: groupLevel/whole_brain
-            base_workflow_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, 'work_flows/groupLevel_timeEffect/whole_brain')
+            base_workflow_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, 'work_flows/groupLevel/whole_brain')
             
             # Add data source subdirectory if not 'standard'
             if args.data_source and args.data_source != 'standard':
