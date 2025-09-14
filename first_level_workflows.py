@@ -222,41 +222,38 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
 
     # Data sinks for copes and varcopes with BIDS naming
     if bids_entities:
-        # Use DerivativesDataSink for BIDS-compliant naming
-        # Create a dummy source file path for BIDS entity extraction
-        source_file = f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_bold.nii.gz"
-        
+        # Use DataSink with custom substitutions for BIDS naming without extra directories
         # Create the target directory structure manually
         target_dir = os.path.join(output_dir, f"ses-{bids_entities.get('session', 'unknown')}", 'func')
         
+        # Create substitutions to rename files to BIDS format
+        substitutions = [
+            ('cope1.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope1_bold.nii.gz"),
+            ('cope2.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope2_bold.nii.gz"),
+            ('cope3.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope3_bold.nii.gz"),
+            ('cope4.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope4_bold.nii.gz"),
+            ('cope5.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-cope5_bold.nii.gz"),
+            ('varcope1.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope1_bold.nii.gz"),
+            ('varcope2.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope2_bold.nii.gz"),
+            ('varcope3.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope3_bold.nii.gz"),
+            ('varcope4.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope4_bold.nii.gz"),
+            ('varcope5.nii.gz', f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_desc-varcope5_bold.nii.gz"),
+        ]
+        
         ds_copes = [
-            pe.Node(DerivativesDataSink(
+            pe.Node(DataSink(
                 base_directory=target_dir,
-                out_path_base='',
-                source_file=source_file,
-                subject=bids_entities.get('subject'),
-                session=bids_entities.get('session'),
-                task=bids_entities.get('task'),
-                space=bids_entities.get('space', 'MNI152NLin2009cAsym'),
-                desc=f'cope{i}',
-                suffix='bold',
-                extension='.nii.gz'),
+                parameterization=False,
+                substitutions=substitutions),
                 name=f'ds_cope{i}', run_without_submitting=True)
             for i in range(1, n_contrasts + 1)
         ]
 
         ds_varcopes = [
-            pe.Node(DerivativesDataSink(
+            pe.Node(DataSink(
                 base_directory=target_dir,
-                out_path_base='',
-                source_file=source_file,
-                subject=bids_entities.get('subject'),
-                session=bids_entities.get('session'),
-                task=bids_entities.get('task'),
-                space=bids_entities.get('space', 'MNI152NLin2009cAsym'),
-                desc=f'varcope{i}',
-                suffix='bold',
-                extension='.nii.gz'),
+                parameterization=False,
+                substitutions=substitutions),
                 name=f'ds_varcope{i}', run_without_submitting=True)
             for i in range(1, n_contrasts + 1)
         ]
@@ -287,10 +284,10 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     # Add data sink connections
     for i in range(1, n_contrasts + 1):
         if bids_entities:
-            # For BIDS naming, connect directly to in_file
+            # For BIDS naming, use @ syntax to avoid subdirectories and let substitutions handle renaming
             connections.extend([
-                (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
-                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
+                (feat_select, ds_copes[i - 1], [(f'cope{i}', f'cope{i}.@')]),
+                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', f'varcope{i}.@')])
             ])
         else:
             # For simple naming, use @ syntax to avoid subdirectories
