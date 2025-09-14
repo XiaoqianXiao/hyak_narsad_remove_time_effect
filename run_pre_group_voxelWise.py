@@ -137,18 +137,18 @@ def get_contrast_range(task):
         list: Range of contrast numbers
     """
     if task == 'phase2':
-        # Phase 2: 9 interesting contrasts (focused set)
-        return list(range(1, 10))
+        # Phase 2: 18 contrasts (all available contrasts)
+        return list(range(1, 19))
     elif task == 'phase3':
-        # Phase 3: 9 interesting contrasts (focused set)
-        return list(range(1, 10))
+        # Phase 3: 18 contrasts (all available contrasts)
+        return list(range(1, 19))
     else:
         # Default fallback
-        return list(range(1, 10))
+        return list(range(1, 19))
 
 # Default contrast range (will be overridden per task)
 # This is a fallback - actual ranges are determined dynamically per task
-CONTRAST_RANGE = list(range(1, 10))  # Contrasts 1-9 (fallback)
+CONTRAST_RANGE = list(range(1, 19))  # Contrasts 1-18 (fallback)
 
 # =============================================================================
 # DATA LOADING FUNCTIONS
