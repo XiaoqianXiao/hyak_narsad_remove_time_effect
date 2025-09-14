@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class DerivativesDataSink(BIDSDerivatives):
     """Custom data sink for first-level analysis outputs."""
-    out_path_base = 'firstLevel'
+    out_path_base = ''
 
 DATA_ITEMS = ['bold', 'mask', 'events', 'regressors', 'tr']
 DATA_ITEMS_LSS = ['bold', 'mask', 'events', 'regressors', 'tr', 'trial_ID']
@@ -223,14 +223,16 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     # Data sinks for copes and varcopes
     ds_copes = [
         pe.Node(DerivativesDataSink(
-            base_directory=str(output_dir), keep_dtype=False, desc=f'cope{i}'),
+            base_directory=str(output_dir), keep_dtype=False, desc=f'cope{i}', 
+            out_path_base='', suffix=''),
             name=f'ds_cope{i}', run_without_submitting=True)
         for i in range(1, n_contrasts + 1)
     ]
 
     ds_varcopes = [
         pe.Node(DerivativesDataSink(
-            base_directory=str(output_dir), keep_dtype=False, desc=f'varcope{i}'),
+            base_directory=str(output_dir), keep_dtype=False, desc=f'varcope{i}',
+            out_path_base='', suffix=''),
             name=f'ds_varcope{i}', run_without_submitting=True)
         for i in range(1, n_contrasts + 1)
     ]
