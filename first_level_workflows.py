@@ -2,8 +2,8 @@
 from nipype.pipeline import engine as pe
 from nipype.algorithms.modelgen import SpecifyModel
 from nipype.interfaces import fsl, utility as niu, io as nio
-from niworkflows.interfaces.bids import DerivativesDataSink as BIDSDerivatives
 from nipype.interfaces.io import DataSink
+from niworkflows.interfaces.bids import DerivativesDataSink
 from utils import _dict_ds
 from utils import _dict_ds_lss
 from utils import _bids2nipypeinfo
@@ -19,10 +19,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
 # =============================================================================
-
-class DerivativesDataSink(BIDSDerivatives):
-    """Custom data sink for first-level analysis outputs."""
-    out_path_base = ''
 
 DATA_ITEMS = ['bold', 'mask', 'events', 'regressors', 'tr']
 DATA_ITEMS_LSS = ['bold', 'mask', 'events', 'regressors', 'tr', 'trial_ID']
@@ -131,7 +127,7 @@ def extract_cs_conditions(df_trial_info):
 def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None, 
                    fwhm=6.0, brightness_threshold=1000, high_pass_cutoff=100,
                    use_smoothing=True, use_derivatives=True, model_serial_correlations=True,
-                   df_conditions=None):
+                   df_conditions=None, bids_entities=None):
     """
     Generic first-level workflow for fMRI analysis.
     
@@ -146,6 +142,8 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
         use_smoothing (bool): Whether to apply smoothing
         use_derivatives (bool): Whether to use temporal derivatives
         model_serial_correlations (bool): Whether to model serial correlations
+        df_conditions (pandas.DataFrame): Processed DataFrame with conditions
+        bids_entities (dict): BIDS entities for proper file naming
     
     Returns:
         pe.Workflow: Configured first-level workflow
@@ -221,22 +219,60 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
         **{f'varcope{i}': f'varcope{i}.nii.gz' for i in range(1, n_contrasts + 1)}
     }), name='feat_select')
 
-    # Data sinks for copes and varcopes
-    ds_copes = [
-        pe.Node(DataSink(
-            base_directory=str(output_dir), 
-            parameterization=False),
-            name=f'ds_cope{i}', run_without_submitting=True)
-        for i in range(1, n_contrasts + 1)
-    ]
+    # Data sinks for copes and varcopes with BIDS naming
+    if bids_entities:
+        # Use DerivativesDataSink for BIDS-compliant naming
+        # Create a dummy source file path for BIDS entity extraction
+        source_file = f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_bold.nii.gz"
+        
+        ds_copes = [
+            pe.Node(DerivativesDataSink(
+                base_directory=str(output_dir),
+                out_path_base='',
+                source_file=source_file,
+                subject=bids_entities.get('subject'),
+                session=bids_entities.get('session'),
+                task=bids_entities.get('task'),
+                space=bids_entities.get('space', 'MNI152NLin2009cAsym'),
+                desc=f'cope{i}',
+                suffix='bold',
+                extension='.nii.gz'),
+                name=f'ds_cope{i}', run_without_submitting=True)
+            for i in range(1, n_contrasts + 1)
+        ]
 
-    ds_varcopes = [
-        pe.Node(DataSink(
-            base_directory=str(output_dir), 
-            parameterization=False),
-            name=f'ds_varcope{i}', run_without_submitting=True)
-        for i in range(1, n_contrasts + 1)
-    ]
+        ds_varcopes = [
+            pe.Node(DerivativesDataSink(
+                base_directory=str(output_dir),
+                out_path_base='',
+                source_file=source_file,
+                subject=bids_entities.get('subject'),
+                session=bids_entities.get('session'),
+                task=bids_entities.get('task'),
+                space=bids_entities.get('space', 'MNI152NLin2009cAsym'),
+                desc=f'varcope{i}',
+                suffix='bold',
+                extension='.nii.gz'),
+                name=f'ds_varcope{i}', run_without_submitting=True)
+            for i in range(1, n_contrasts + 1)
+        ]
+    else:
+        # Fallback to simple DataSink without BIDS naming
+        ds_copes = [
+            pe.Node(DataSink(
+                base_directory=str(output_dir), 
+                parameterization=False),
+                name=f'ds_cope{i}', run_without_submitting=True)
+            for i in range(1, n_contrasts + 1)
+        ]
+
+        ds_varcopes = [
+            pe.Node(DataSink(
+                base_directory=str(output_dir), 
+                parameterization=False),
+                name=f'ds_varcope{i}', run_without_submitting=True)
+            for i in range(1, n_contrasts + 1)
+        ]
 
     # Build workflow connections
     connections = _build_workflow_connections(
@@ -246,10 +282,18 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     
     # Add data sink connections
     for i in range(1, n_contrasts + 1):
-        connections.extend([
-            (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
-            (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
-        ])
+        if bids_entities:
+            # For BIDS naming, connect directly to in_file
+            connections.extend([
+                (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
+                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
+            ])
+        else:
+            # For simple naming, use @ syntax to avoid subdirectories
+            connections.extend([
+                (feat_select, ds_copes[i - 1], [(f'cope{i}', f'cope{i}.@')]),
+                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', f'varcope{i}.@')])
+            ])
 
     workflow.connect(connections)
     return workflow

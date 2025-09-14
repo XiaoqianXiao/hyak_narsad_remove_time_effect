@@ -364,7 +364,7 @@ apptainer exec \\
 # WORKFLOW EXECUTION
 # =============================================================================
 
-def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
+def run_subject_workflow(sub, inputs, work_dir, output_dir, task, entities=None):
     """
     Run first-level workflow for a single subject.
     
@@ -374,6 +374,7 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
         work_dir (str): Working directory
         output_dir (str): Output directory
         task (str): Task name
+        entities (dict): BIDS entities for proper file naming
     """
     try:
         # Import workflows
@@ -405,7 +406,8 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
             use_smoothing=config['use_smoothing'],
             use_derivatives=config['use_derivatives'],
             model_serial_correlations=config['model_serial_correlations'],
-            df_conditions=df_with_conditions
+            df_conditions=df_with_conditions,
+            bids_entities=entities
         )
         
         # Set workflow base directory
@@ -460,7 +462,7 @@ def process_single_subject(args, layout, query):
                 inputs = create_subject_inputs(sub, part, layout, query)
                 
                 logger.info(f"Running first-level analysis for subject {sub}, task {task}")
-                run_subject_workflow(sub, inputs, work_dir, OUTPUT_DIR, task)
+                run_subject_workflow(sub, inputs, work_dir, OUTPUT_DIR, task, entities)
                 
             except Exception as e:
                 logger.error(f"Failed to process subject {sub}: {e}")
