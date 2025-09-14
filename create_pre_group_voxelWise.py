@@ -97,15 +97,14 @@ DEFAULT_SLURM_PARAMS = {
     'time': '04:00:00',
     'mem': '32G',
     'cpus_per_task': 4,
-    'container': '/gscratch/scrubbed/fanglab/xiaoqian/images/narsad-fmri_1st_level_1.0.sif'
+    'container': '/gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/narsad-fmri_1st_level_1.0.sif'
 }
 
 def get_cope_list(derivatives_dir):
     """Get list of copes and phases from derivatives directory."""
     copes = []
-    
     # The derivatives_dir should point to the fMRI_analysis directory
-    # so we just need to append 'firstLevel_timeEffect'
+    # so we just need to append 'firstLevel'
     first_level_dir = os.path.join(derivatives_dir, 'firstLevel_timeEffect')
     
     logger.info(f"Looking for first level directory at: {first_level_dir}")
@@ -114,61 +113,53 @@ def get_cope_list(derivatives_dir):
         logger.warning(f"First level directory not found: {first_level_dir}")
         return copes
     
-    # Look for task directories (phase2, phase3, etc.)
-    for task_item in os.listdir(first_level_dir):
-        task_dir = os.path.join(first_level_dir, task_item)
-        if not os.path.isdir(task_dir):
-            continue
+    # Look for subject directories (e.g., sub-N101, sub-N102, etc.)
+    for item in os.listdir(first_level_dir):
+        if item.startswith('sub-') and os.path.isdir(os.path.join(first_level_dir, item)):
+            subject_dir = os.path.join(first_level_dir, item)
             
-        # Extract phase from task directory name
-        if task_item.startswith('phase'):
-            phase = task_item
-        else:
-            continue
-            
-        logger.info(f"Scanning task directory: {task_dir}")
-        
-        # Look for subject directories within this task
-        for subject_item in os.listdir(task_dir):
-            if subject_item.startswith('sub-') and os.path.isdir(os.path.join(task_dir, subject_item)):
-                subject_dir = os.path.join(task_dir, subject_item)
-                
-                # Check for session directories (e.g., ses-pilot3mm, ses-001, etc.)
-                for session in os.listdir(subject_dir):
-                    if session.startswith('ses-') and os.path.isdir(os.path.join(subject_dir, session)):
-                        session_dir = os.path.join(subject_dir, session)
-                        func_dir = os.path.join(session_dir, 'func')
+            # Check for session directories (e.g., ses-pilot3mm, ses-001, etc.)
+            for session in os.listdir(subject_dir):
+                if session.startswith('ses-') and os.path.isdir(os.path.join(subject_dir, session)):
+                    session_dir = os.path.join(subject_dir, session)
+                    func_dir = os.path.join(session_dir, 'func')
+                    
+                    if os.path.exists(func_dir):
+                        # Check what phases and copes this subject has by looking at the func files
+                        phase_cope_files = {}
+                        logger.info(f"Scanning func directory: {func_dir}")
+                        for file in os.listdir(func_dir):
+                            if file.endswith('_bold.nii') and 'task-phase' in file:
+                                # Extract phase and cope from filename
+                                # Handle complex filenames like: sub-N101_ses-pilot3mm_task-phase3_space-MNI152NLin2009cAsym_desc-varcope9_bold.nii
+                                logger.info(f"Found bold file: {file}")
+                                
+                                # Extract phase
+                                if 'task-phase2' in file:
+                                    phase = 'phase2'
+                                elif 'task-phase3' in file:
+                                    phase = 'phase3'
+                                else:
+                                    continue
+                                
+                                # Extract cope number from desc-varcopeX or desc-copeX
+                                cope_num = None
+                                if 'desc-varcope' in file:
+                                    cope_num = int(file.split('desc-varcope')[1].split('_')[0])
+                                elif 'desc-cope' in file:
+                                    cope_num = int(file.split('desc-cope')[1].split('_')[0])
+                                
+                                if cope_num is not None:
+                                    if phase not in phase_cope_files:
+                                        phase_cope_files[phase] = set()
+                                    phase_cope_files[phase].add(cope_num)
+                                    logger.info(f"  -> Phase {phase}, Cope {cope_num} detected")
                         
-                        if os.path.exists(func_dir):
-                            # Check what copes this subject has by looking at the cope* subdirectories
-                            phase_cope_files = {}
-                            logger.info(f"Scanning func directory: {func_dir}")
-                            
-                            # Look for cope* subdirectories
-                            for item in os.listdir(func_dir):
-                                if item.startswith('cope') and os.path.isdir(os.path.join(func_dir, item)):
-                                    try:
-                                        # Extract cope number from directory name (e.g., cope1 -> 1)
-                                        cope_num = int(item.replace('cope', ''))
-                                        
-                                        # Check if there are files in this cope directory
-                                        cope_dir = os.path.join(func_dir, item)
-                                        cope_files = [f for f in os.listdir(cope_dir) if f.endswith('.nii') or f.endswith('.nii.gz')]
-                                        
-                                        if cope_files:
-                                            if phase not in phase_cope_files:
-                                                phase_cope_files[phase] = set()
-                                            phase_cope_files[phase].add(cope_num)
-                                            logger.info(f"  -> Phase {phase}, Cope {cope_num} detected")
-                                    except ValueError:
-                                        # Skip if cope number can't be extracted
-                                        continue
-                            
-                            # Add phase-cope combinations for this subject
-                            for phase, cope_numbers in phase_cope_files.items():
-                                for cope_num in cope_numbers:
-                                    copes.append((phase, cope_num))
-                            # Continue to check other sessions (don't break)
+                        # Add phase-cope combinations for this subject
+                        for phase, cope_numbers in phase_cope_files.items():
+                            for cope_num in cope_numbers:
+                                copes.append((phase, cope_num))
+                        # Continue to check other sessions (don't break)
     
     # Remove duplicates and sort
     unique_copes = list(set(copes))
