@@ -103,6 +103,7 @@ DEFAULT_SLURM_PARAMS = {
 def get_cope_list(derivatives_dir):
     """Get list of copes and phases from derivatives directory."""
     copes = []
+    
     # The derivatives_dir should point to the fMRI_analysis directory
     # so we just need to append 'firstLevel_timeEffect'
     first_level_dir = os.path.join(derivatives_dir, 'firstLevel_timeEffect')

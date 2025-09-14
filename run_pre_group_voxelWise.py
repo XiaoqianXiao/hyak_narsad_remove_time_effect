@@ -464,21 +464,37 @@ def find_files_in_cope_subdirs(sub, task, contrast):
         cope_file = None
         varcope_file = None
         
-        # Find cope file
+        # Find cope file (BIDS format)
         if os.path.exists(cope_subdir):
-            cope_files = glob.glob(os.path.join(cope_subdir, f'cope{contrast}.nii*'))
-            logger.info(f"Found cope files: {cope_files}")
+            # Look for BIDS format files: sub-*_ses-*_task-*_space-*_desc-cope{contrast}_bold.nii*
+            cope_pattern = os.path.join(cope_subdir, f'*_desc-cope{contrast}_bold.nii*')
+            cope_files = glob.glob(cope_pattern)
+            logger.info(f"Found cope files (BIDS pattern): {cope_files}")
             if cope_files:
                 cope_file = cope_files[0]
+            else:
+                # Fallback to simple pattern
+                cope_files = glob.glob(os.path.join(cope_subdir, f'cope{contrast}.nii*'))
+                logger.info(f"Found cope files (fallback): {cope_files}")
+                if cope_files:
+                    cope_file = cope_files[0]
         else:
             logger.warning(f"Cope subdirectory does not exist: {cope_subdir}")
         
-        # Find varcope file
+        # Find varcope file (BIDS format)
         if os.path.exists(varcope_subdir):
-            varcope_files = glob.glob(os.path.join(varcope_subdir, f'varcope{contrast}.nii*'))
-            logger.info(f"Found varcope files: {varcope_files}")
+            # Look for BIDS format files: sub-*_ses-*_task-*_space-*_desc-varcope{contrast}_bold.nii*
+            varcope_pattern = os.path.join(varcope_subdir, f'*_desc-varcope{contrast}_bold.nii*')
+            varcope_files = glob.glob(varcope_pattern)
+            logger.info(f"Found varcope files (BIDS pattern): {varcope_files}")
             if varcope_files:
                 varcope_file = varcope_files[0]
+            else:
+                # Fallback to simple pattern
+                varcope_files = glob.glob(os.path.join(varcope_subdir, f'varcope{contrast}.nii*'))
+                logger.info(f"Found varcope files (fallback): {varcope_files}")
+                if varcope_files:
+                    varcope_file = varcope_files[0]
         else:
             logger.warning(f"Varcope subdirectory does not exist: {varcope_subdir}")
         
