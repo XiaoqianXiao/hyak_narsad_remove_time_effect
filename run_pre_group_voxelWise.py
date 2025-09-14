@@ -378,7 +378,7 @@ def collect_task_data(task, contrast, subject_list, glayout):
     
     for sub in subject_list:
         try:
-            # Get cope file
+            # First try BIDS layout approach
             cope_file = glayout.get(
                 subject=sub, 
                 task=task, 
@@ -387,7 +387,6 @@ def collect_task_data(task, contrast, subject_list, glayout):
                 return_type='file'
             )
             
-            # Get varcope file
             varcope_file = glayout.get(
                 subject=sub, 
                 task=task, 
@@ -396,9 +395,13 @@ def collect_task_data(task, contrast, subject_list, glayout):
                 return_type='file'
             )
             
+            # If BIDS layout doesn't find files, try direct file search in cope* subdirectories
+            if not cope_file or not varcope_file:
+                cope_file, varcope_file = find_files_in_cope_subdirs(sub, task, contrast)
+            
             if cope_file and varcope_file:
-                copes.append(cope_file[0])
-                varcopes.append(varcope_file[0])
+                copes.append(cope_file[0] if isinstance(cope_file, list) else cope_file)
+                varcopes.append(varcope_file[0] if isinstance(varcope_file, list) else varcope_file)
             else:
                 logger.warning(f"Missing files for task-{task}, sub-{sub}, cope{contrast}")
                 
@@ -407,6 +410,62 @@ def collect_task_data(task, contrast, subject_list, glayout):
             continue
     
     return copes, varcopes
+
+def find_files_in_cope_subdirs(sub, task, contrast):
+    """
+    Find cope and varcope files in cope* subdirectories.
+    
+    Args:
+        sub (str): Subject ID
+        task (str): Task name
+        contrast (int): Contrast number
+    
+    Returns:
+        tuple: (cope_file_path, varcope_file_path) or (None, None) if not found
+    """
+    try:
+        # Construct the base path for the subject
+        base_path = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/firstLevel_timeEffect', task, f'sub-{sub}')
+        
+        # Look for session directories
+        session_dirs = [d for d in os.listdir(base_path) if d.startswith('ses-') and os.path.isdir(os.path.join(base_path, d))]
+        
+        if not session_dirs:
+            logger.warning(f"No session directories found for sub-{sub} in {base_path}")
+            return None, None
+        
+        # Use the first session found (or you could modify this logic as needed)
+        session = session_dirs[0]
+        func_dir = os.path.join(base_path, session, 'func')
+        
+        if not os.path.exists(func_dir):
+            logger.warning(f"Func directory not found: {func_dir}")
+            return None, None
+        
+        # Look for cope and varcope subdirectories
+        cope_subdir = os.path.join(func_dir, f'cope{contrast}')
+        varcope_subdir = os.path.join(func_dir, f'varcope{contrast}')
+        
+        cope_file = None
+        varcope_file = None
+        
+        # Find cope file
+        if os.path.exists(cope_subdir):
+            cope_files = glob.glob(os.path.join(cope_subdir, f'cope{contrast}.nii*'))
+            if cope_files:
+                cope_file = cope_files[0]
+        
+        # Find varcope file
+        if os.path.exists(varcope_subdir):
+            varcope_files = glob.glob(os.path.join(varcope_subdir, f'varcope{contrast}.nii*'))
+            if varcope_files:
+                varcope_file = varcope_files[0]
+        
+        return cope_file, varcope_file
+        
+    except Exception as e:
+        logger.error(f"Error finding files in cope subdirectories for sub-{sub}, task-{task}, cope{contrast}: {e}")
+        return None, None
 
 def filter_subjects_for_task(subject_list, task, df_behav):
     """
