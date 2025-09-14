@@ -389,10 +389,14 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
         logger.info(f"Processing subject {sub}, task {task}")
         logger.info(f"Workflow config: {config}")
         
+        # Create subject-specific output directory
+        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
+        Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
+        
         # Create the workflow with processed DataFrame
         workflow = first_level_wf(
             in_files=inputs,
-            output_dir=output_dir,
+            output_dir=subject_output_dir,
             condition_names=condition_names,
             contrasts=contrasts,
             fwhm=config['fwhm'],
@@ -406,10 +410,6 @@ def run_subject_workflow(sub, inputs, work_dir, output_dir, task):
         
         # Set workflow base directory
         workflow.base_dir = os.path.join(work_dir, f'sub_{sub}')
-        
-        # Create output directory for this subject
-        subject_output_dir = os.path.join(output_dir, 'firstLevel_timeEffect', task, f'sub-{sub}')
-        Path(subject_output_dir).mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Running workflow for subject {sub}, task {task}")
         logger.info(f"Workflow base directory: {workflow.base_dir}")

@@ -716,7 +716,7 @@ Examples:
             logger.info(f"Using custom output directory as base: {base_results_dir}")
         else:
             # Standard base: groupLevel/whole_brain
-            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/groupLevel/whole_brain')
+            base_results_dir = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/groupLevel_timeEffect/whole_brain')
             logger.info(f"Using default base directory: {base_results_dir}")
         
         # Always add data source components to the base directory
@@ -743,7 +743,7 @@ Examples:
             workflow_dir = args.workflow_dir
         else:
             # Standard base: groupLevel/whole_brain
-            base_workflow_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, 'work_flows/groupLevel/whole_brain')
+            base_workflow_dir = os.path.join(SCRUBBED_DIR, PROJECT_NAME, 'work_flows/groupLevel_timeEffect/whole_brain')
             
             # Add data source subdirectory if not 'standard'
             if args.data_source and args.data_source != 'standard':

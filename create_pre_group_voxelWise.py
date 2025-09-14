@@ -178,9 +178,7 @@ def create_slurm_script(phase, cope_num, output_dir, script_dir, slurm_params, d
     container_binds = [
         "-B /gscratch/fang:/data",
         "-B /gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir",
-        "-B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/group_level_workflows.py:/app/group_level_workflows.py",
-        "-B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/run_pre_group_voxelWise.py:/app/run_pre_group_voxelWise.py",
-        "-B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect:/app/updated"
+        "-B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect:/app"
     ]
     
     # Convert container path to host path for mkdir command
@@ -295,8 +293,8 @@ Examples:
     
     # Use container paths directly since this script runs inside the container
     logger.info("Using container paths directly")
-    output_dir = '/data/NARSAD/MRI/derivatives/fMRI_analysis/groupLevel_timeEffect'
-    derivatives_dir = '/data/NARSAD/MRI/derivatives/fMRI_analysis'
+    output_dir = '/data/NARSAD/MRI/derivatives/fMRI_analysis_remove/groupLevel_timeEffect'
+    derivatives_dir = '/data/NARSAD/MRI/derivatives/fMRI_analysis_remove'
     
     # Set script directory - use default workdir/pregroup structure
     scrubbed_dir = os.getenv('SCRUBBED_DIR', '/scrubbed_dir')

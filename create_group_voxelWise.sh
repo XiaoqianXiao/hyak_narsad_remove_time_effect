@@ -195,7 +195,7 @@ PARTITION="$DEFAULT_PARTITION"
 CPUS_PER_TASK="$DEFAULT_CPUS_PER_TASK"
 MEMORY="$DEFAULT_MEMORY"
 TIME="$DEFAULT_TIME"
-BASE_DIR="/gscratch/fang/NARSAD/MRI/derivatives/fMRI_analysis"
+BASE_DIR="/gscratch/fang/NARSAD/MRI/derivatives/fMRI_analysis_remove"
 SCRIPT_DIR=""
 
 # Parse command line arguments
@@ -350,13 +350,13 @@ for task in "${TASKS[@]}"; do
 #SBATCH --error=${err_path}
 
 module load apptainer
-apptainer exec -B /gscratch/fang:/data -B /gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/group_level_workflows.py:/app/group_level_workflows.py -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect/run_group_voxelWise.py:/app/run_group_voxelWise.py ${CONTAINER_PATH} \\
+apptainer exec -B /gscratch/fang:/data -B /gscratch/scrubbed/fanglab/xiaoqian:/scrubbed_dir -B /gscratch/scrubbed/fanglab/xiaoqian/repo/hyak_narsad_remove_time_effect:/app ${CONTAINER_PATH} \\
     python3 /app/${SCRIPT_NAME} \\
     --task ${task} \\
     --contrast ${contrast} \\
     --analysis-type ${analysis_type} \\
     --data-source ${DATA_SOURCE} \\
-    --base-dir /data/NARSAD/MRI/derivatives/fMRI_analysis
+    --base-dir /data/NARSAD/MRI/derivatives/fMRI_analysis_remove
 
 EOF
             
