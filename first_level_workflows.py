@@ -284,10 +284,10 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     # Add data sink connections
     for i in range(1, n_contrasts + 1):
         if bids_entities:
-            # For BIDS naming, use @ syntax to avoid subdirectories and let substitutions handle renaming
+            # For BIDS naming, connect directly to in_file and let substitutions handle renaming
             connections.extend([
-                (feat_select, ds_copes[i - 1], [(f'cope{i}', f'cope{i}.@')]),
-                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', f'varcope{i}.@')])
+                (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
+                (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
             ])
         else:
             # For simple naming, use @ syntax to avoid subdirectories
