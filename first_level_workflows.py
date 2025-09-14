@@ -3,6 +3,7 @@ from nipype.pipeline import engine as pe
 from nipype.algorithms.modelgen import SpecifyModel
 from nipype.interfaces import fsl, utility as niu, io as nio
 from niworkflows.interfaces.bids import DerivativesDataSink as BIDSDerivatives
+from nipype.interfaces.io import DataSink
 from utils import _dict_ds
 from utils import _dict_ds_lss
 from utils import _bids2nipypeinfo
@@ -222,17 +223,17 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
 
     # Data sinks for copes and varcopes
     ds_copes = [
-        pe.Node(DerivativesDataSink(
-            base_directory=str(output_dir), keep_dtype=False, desc=f'cope{i}', 
-            out_path_base='', suffix=''),
+        pe.Node(DataSink(
+            base_directory=str(output_dir), 
+            parameterization=False),
             name=f'ds_cope{i}', run_without_submitting=True)
         for i in range(1, n_contrasts + 1)
     ]
 
     ds_varcopes = [
-        pe.Node(DerivativesDataSink(
-            base_directory=str(output_dir), keep_dtype=False, desc=f'varcope{i}',
-            out_path_base='', suffix=''),
+        pe.Node(DataSink(
+            base_directory=str(output_dir), 
+            parameterization=False),
             name=f'ds_varcope{i}', run_without_submitting=True)
         for i in range(1, n_contrasts + 1)
     ]
@@ -246,8 +247,6 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
     # Add data sink connections
     for i in range(1, n_contrasts + 1):
         connections.extend([
-            (datasource, ds_copes[i - 1], [('bold', 'source_file')]),
-            (datasource, ds_varcopes[i - 1], [('bold', 'source_file')]),
             (feat_select, ds_copes[i - 1], [(f'cope{i}', 'in_file')]),
             (feat_select, ds_varcopes[i - 1], [(f'varcope{i}', 'in_file')])
         ])
