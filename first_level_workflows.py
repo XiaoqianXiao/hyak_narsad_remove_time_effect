@@ -11,6 +11,7 @@ from utils import _bids2nipypeinfo_from_df
 from utils import _bids2nipypeinfo_lss
 from nipype.interfaces.fsl import SUSAN, ApplyMask, FLIRT, FILMGLS, Level1Design, FEATModel
 import logging
+import os
 
 # Author: Xiaoqian Xiao (xiao.xiaoqian.320@gmail.com)
 # Configure logging
@@ -225,9 +226,12 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
         # Create a dummy source file path for BIDS entity extraction
         source_file = f"sub-{bids_entities.get('subject', 'unknown')}_ses-{bids_entities.get('session', 'unknown')}_task-{bids_entities.get('task', 'unknown')}_space-{bids_entities.get('space', 'MNI152NLin2009cAsym')}_bold.nii.gz"
         
+        # Create the target directory structure manually
+        target_dir = os.path.join(output_dir, f"ses-{bids_entities.get('session', 'unknown')}", 'func')
+        
         ds_copes = [
             pe.Node(DerivativesDataSink(
-                base_directory=str(output_dir),
+                base_directory=target_dir,
                 out_path_base='',
                 source_file=source_file,
                 subject=bids_entities.get('subject'),
@@ -243,7 +247,7 @@ def first_level_wf(in_files, output_dir, condition_names=None, contrasts=None,
 
         ds_varcopes = [
             pe.Node(DerivativesDataSink(
-                base_directory=str(output_dir),
+                base_directory=target_dir,
                 out_path_base='',
                 source_file=source_file,
                 subject=bids_entities.get('subject'),
