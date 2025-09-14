@@ -396,7 +396,8 @@ def collect_task_data(task, contrast, subject_list, glayout):
             )
             
             # If BIDS layout doesn't find files, try direct file search in cope* subdirectories
-            if not cope_file or not varcope_file:
+            if not cope_file or not varcope_file or len(cope_file) == 0 or len(varcope_file) == 0:
+                logger.info(f"BIDS layout didn't find files for sub-{sub}, task-{task}, cope{contrast}, trying direct search...")
                 cope_file, varcope_file = find_files_in_cope_subdirs(sub, task, contrast)
             
             if cope_file and varcope_file:
@@ -426,9 +427,15 @@ def find_files_in_cope_subdirs(sub, task, contrast):
     try:
         # Construct the base path for the subject
         base_path = os.path.join(DERIVATIVES_DIR, 'fMRI_analysis_remove/firstLevel_timeEffect', task, f'sub-{sub}')
+        logger.info(f"Searching for files in: {base_path}")
+        
+        if not os.path.exists(base_path):
+            logger.warning(f"Base path does not exist: {base_path}")
+            return None, None
         
         # Look for session directories
         session_dirs = [d for d in os.listdir(base_path) if d.startswith('ses-') and os.path.isdir(os.path.join(base_path, d))]
+        logger.info(f"Found session directories: {session_dirs}")
         
         if not session_dirs:
             logger.warning(f"No session directories found for sub-{sub} in {base_path}")
@@ -437,14 +444,22 @@ def find_files_in_cope_subdirs(sub, task, contrast):
         # Use the first session found (or you could modify this logic as needed)
         session = session_dirs[0]
         func_dir = os.path.join(base_path, session, 'func')
+        logger.info(f"Checking func directory: {func_dir}")
         
         if not os.path.exists(func_dir):
             logger.warning(f"Func directory not found: {func_dir}")
             return None, None
         
+        # List contents of func directory
+        func_contents = os.listdir(func_dir)
+        logger.info(f"Func directory contents: {func_contents}")
+        
         # Look for cope and varcope subdirectories
         cope_subdir = os.path.join(func_dir, f'cope{contrast}')
         varcope_subdir = os.path.join(func_dir, f'varcope{contrast}')
+        
+        logger.info(f"Looking for cope subdirectory: {cope_subdir}")
+        logger.info(f"Looking for varcope subdirectory: {varcope_subdir}")
         
         cope_file = None
         varcope_file = None
@@ -452,15 +467,22 @@ def find_files_in_cope_subdirs(sub, task, contrast):
         # Find cope file
         if os.path.exists(cope_subdir):
             cope_files = glob.glob(os.path.join(cope_subdir, f'cope{contrast}.nii*'))
+            logger.info(f"Found cope files: {cope_files}")
             if cope_files:
                 cope_file = cope_files[0]
+        else:
+            logger.warning(f"Cope subdirectory does not exist: {cope_subdir}")
         
         # Find varcope file
         if os.path.exists(varcope_subdir):
             varcope_files = glob.glob(os.path.join(varcope_subdir, f'varcope{contrast}.nii*'))
+            logger.info(f"Found varcope files: {varcope_files}")
             if varcope_files:
                 varcope_file = varcope_files[0]
+        else:
+            logger.warning(f"Varcope subdirectory does not exist: {varcope_subdir}")
         
+        logger.info(f"Final result: cope_file={cope_file}, varcope_file={varcope_file}")
         return cope_file, varcope_file
         
     except Exception as e:
